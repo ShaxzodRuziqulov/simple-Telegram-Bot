@@ -21,6 +21,9 @@ import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
@@ -30,6 +33,7 @@ import java.util.List;
 @Slf4j
 @Component
 public class Telegram_Bot extends TelegramLongPollingBot {
+    static final String ERROR_TEXT = "Error occurred: ";
     private UserRepository userRepository;
     private static final String HELP_TEXT = """
             This bot is created to demonstrate Spring capabilities.
@@ -74,7 +78,6 @@ public class Telegram_Bot extends TelegramLongPollingBot {
                 case "/start":
                     registerUser(update.getMessage());
                     startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
-
                     break;
                 case "/help":
                     sendMessage(chatId, HELP_TEXT);
@@ -103,22 +106,54 @@ public class Telegram_Bot extends TelegramLongPollingBot {
     }
 
     private void startCommandReceived(Long chatId, String name) throws TelegramApiException {
-        String answer = "Hi " + name + " nice to meet you! ";
+        String answer = "Hi " + name + " nice to meet you! " + "\uD83D\uDE04";
         log.info("Replied to user " + name);
         sendMessage(chatId, answer);
 
     }
 
-    private void sendMessage(Long chatId, String textToSend) {
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setText(textToSend);
-        sendMessage.setChatId(chatId);
+    private void sendMessage(long chatId, String textToSend) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText(textToSend);
+
+        setReplyKeyboard(message);
+    }
+
+    private void setReplyKeyboard(SendMessage message) {
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true);
+        keyboardMarkup.setOneTimeKeyboard(true);
+
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add(new KeyboardButton("weather"));
+        row1.add(new KeyboardButton("get random joke"));
+        keyboardRows.add(row1);
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add(new KeyboardButton("register"));
+        row2.add(new KeyboardButton("check my data"));
+        row2.add(new KeyboardButton("delete my data"));
+        keyboardRows.add(row2);
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+
+        message.setReplyMarkup(keyboardMarkup);
+
+        executeMessage(message);
+    }
+
+
+    private void executeMessage(SendMessage message) {
         try {
-            execute(sendMessage);
+            execute(message);
         } catch (TelegramApiException e) {
-            log.error("Error setting bots command list: " + e.getMessage());
+            log.error(ERROR_TEXT + e.getMessage());
         }
     }
+
 
     @Override
     public String getBotUsername() {
