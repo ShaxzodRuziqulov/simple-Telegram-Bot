@@ -7,6 +7,8 @@
 package com.example.group_project_telegram_bot.service;
 
 import com.example.group_project_telegram_bot.config.BotConfig;
+import com.example.group_project_telegram_bot.model.Ads;
+import com.example.group_project_telegram_bot.model.AdsRepository;
 import com.example.group_project_telegram_bot.model.User;
 import com.example.group_project_telegram_bot.model.UserRepository;
 import com.vdurmont.emoji.EmojiParser;
@@ -14,6 +16,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
@@ -40,7 +43,8 @@ public class Telegram_Bot extends TelegramLongPollingBot {
     static final String ERROR_TEXT = "Error occurred: ";
     static final String YES_BUTTON = "YES_BUTTON";
     static final String NO_BUTTON = "NO_BUTTON";
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final AdsRepository adsRepository;
     private static final String HELP_TEXT = """
             This bot is created to demonstrate Spring capabilities.
 
@@ -55,9 +59,10 @@ public class Telegram_Bot extends TelegramLongPollingBot {
     public final BotConfig botConfig;
 
     @Autowired
-    public Telegram_Bot(BotConfig botConfig, UserRepository userRepository) {
+    public Telegram_Bot(BotConfig botConfig, UserRepository userRepository, AdsRepository adsRepository) {
         super(botConfig.getToken());
         this.botConfig = botConfig;
+        this.adsRepository = adsRepository;
         List<BotCommand> commandList = new ArrayList<>();
         commandList.add(new BotCommand("/start", "get a welcome message"));
         commandList.add(new BotCommand("/mydata", "get your data stored"));
@@ -84,7 +89,7 @@ public class Telegram_Bot extends TelegramLongPollingBot {
                 var textToSend = EmojiParser.parseToUnicode(messageText.substring(messageText.indexOf(" ")));
                 var users = userRepository.findAll();
                 for (User user : users) {
-                    sendMessage(user.getChatId(), textToSend);
+                    prepareAndSendMessage(user.getChatId(), textToSend);
                 }
             } else
                 switch (messageText) {
@@ -93,13 +98,13 @@ public class Telegram_Bot extends TelegramLongPollingBot {
                         startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                         break;
                     case "/help":
-                        sendMessage(chatId, HELP_TEXT);
+                        prepareAndSendMessage(chatId, HELP_TEXT);
                         break;
                     case "/register":
                         register(chatId);
                         break;
                     default:
-                        sendMessage(chatId, "Sorry, command was not recognized");
+                        prepareAndSendMessage(chatId, "Sorry, command was not recognized");
                         break;
 
                 }
@@ -164,7 +169,7 @@ public class Telegram_Bot extends TelegramLongPollingBot {
         }
     }
 
-    private void startCommandReceived(Long chatId, String name) throws TelegramApiException {
+    private void startCommandReceived(Long chatId, String name) {
         String answer = "Hi " + name + " nice to meet you! " + "\uD83D\uDE04";
         log.info("Replied to user " + name);
         sendMessage(chatId, answer);
@@ -219,10 +224,6 @@ public class Telegram_Bot extends TelegramLongPollingBot {
         return botConfig.getBotName();
     }
 
-    public Telegram_Bot(String botToken, BotConfig botConfig) {
-        super(botToken);
-        this.botConfig = botConfig;
-    }
 
     private void executeEditMessageText(String text, long chatId, long messageId) {
         EditMessageText message = new EditMessageText();
@@ -236,4 +237,24 @@ public class Telegram_Bot extends TelegramLongPollingBot {
             log.error(ERROR_TEXT + e.getMessage());
         }
     }
+
+    private void prepareAndSendMessage(long chatId, String textToSend) {
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setText(textToSend);
+        sendMessage.setChatId(chatId);
+        executeMessage(sendMessage);
+    }
+
+    @Scheduled(cron = "${cron.scheduler}")
+    private void sendAds() {
+        var ads = adsRepository.findAll();
+        var users = userRepository.findAll();
+
+        for (Ads ad : ads) {
+            for (User user : users) {
+                prepareAndSendMessage(user.getChatId(), ad.getAd());
+            }
+        }
+    }
+
 }
