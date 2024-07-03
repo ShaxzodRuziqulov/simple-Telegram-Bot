@@ -16,10 +16,10 @@ import java.sql.Timestamp;
 @Table(name = "user_name")
 public class User {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Long chatId;
     private String firstName;
     private String lastName;
     private String userName;
+    private Long phoneNumber;
     private Timestamp registeredAt;
 }
